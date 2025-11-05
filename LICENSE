@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2025 Alphafrench
+Copyright (c) 2025 Classroom Management System Contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -19,3 +19,32 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+Additional licensing information for components used in this project:
+
+PHP 8.2+ - PHP License (v3.01)
+MySQL 8.0+ - GPL License with FOSS License Exception
+Apache 2.4+ - Apache License 2.0
+Bootstrap 5 - MIT License
+jQuery - MIT License
+Font Awesome - SIL OFL 1.1 License
+Chart.js - MIT License
+
+For complete license information, see the NOTICE.md file or visit:
+https://github.com/your-username/classroom-management/blob/main/NOTICE.md
+
+Third-party licenses are included in their respective directories:
+- vendor/ (Composer dependencies)
+- assets/js/ (JavaScript libraries)
+- assets/css/ (CSS frameworks)
+
+This project complies with all open source license requirements and maintains
+a clear separation between original work and third-party components.
+
+Contributors to this project agree to release their contributions under the
+same MIT License terms, ensuring the project remains free and open source.
+
+For questions about licensing or commercial use, please contact:
+legal@classroom-management.com

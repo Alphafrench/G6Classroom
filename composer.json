@@ -1,0 +1,86 @@
+{
+    "name": "classroom-manager/google-classroom-clone",
+    "description": "Professional classroom management system - Google Classroom clone with enhanced features",
+    "type": "project",
+    "keywords": [
+        "classroom",
+        "education",
+        "learning-management",
+        "php",
+        "mysql",
+        "assignment",
+        "grading",
+        "student-management"
+    ],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Classroom Manager Team",
+            "email": "dev@classroom-manager.com",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": ">=8.0",
+        "ext-pdo": "*",
+        "ext-pdo_mysql": "*",
+        "ext-openssl": "*",
+        "ext-curl": "*",
+        "ext-gd": "*",
+        "ext-json": "*",
+        "ext-mbstring": "*"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^9.5",
+        "squizlabs/php_codesniffer": "^3.6",
+        "phpmd/phpmd": "^2.10",
+        "phpstan/phpstan": "^1.4"
+    },
+    "autoload": {
+        "psr-4": {
+            "ClassroomManager\\": "src/"
+        },
+        "files": [
+            "config/config.php",
+            "includes/functions.php"
+        ]
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "ClassroomManager\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit",
+        "cs-check": "phpcs --standard=PSR12 src/ tests/",
+        "cs-fix": "phpcbf --standard=PSR12 src/ tests/",
+        "analyze": "phpstan analyse --level=max src/",
+        "pmd": "phpmd src/ text codesize,controversial,design,unusedcode,naming",
+        "quality": [
+            "@cs-check",
+            "@analyze",
+            "@test"
+        ],
+        "serve": "php -S localhost:8080 -t public/",
+        "install-db": "mysql -u root -p < database/classroom_schema.sql"
+    },
+    "config": {
+        "sort-packages": true,
+        "optimize-autoloader": true,
+        "process-timeout": 2000,
+        "secure-http": false
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "support": {
+        "issues": "https://github.com/classroom-manager/classroom-clone/issues",
+        "wiki": "https://github.com/classroom-manager/classroom-clone/wiki",
+        "source": "https://github.com/classroom-manager/classroom-clone"
+    },
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "https://github.com/classroom-manager/classroom-clone.git"
+        }
+    ]
+}

@@ -1,0 +1,298 @@
+# Google Classroom Clone - Docker Compose Configuration
+# Complete development and production environment setup
+
+version: '3.8'
+
+services:
+  # Main application container
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: classroom-clone-app
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      # Application settings
+      - APP_ENV=development
+      - DEBUG_MODE=true
+      - APP_URL=http://localhost
+      - APP_TIMEZONE=America/New_York
+      
+      # Database configuration
+      - DB_HOST=mysql
+      - DB_NAME=classroom_clone
+      - DB_USER=classroom_user
+      - DB_PASS=classroom_password
+      - DB_PORT=3306
+      
+      # Security settings
+      - GENERATE_KEYS=true
+      - SESSION_TIMEOUT=7200
+      - MAX_LOGIN_ATTEMPTS=5
+      
+      # Email settings (configure as needed)
+      - SMTP_HOST=mailhog
+      - SMTP_PORT=1025
+      - SMTP_USERNAME=
+      - SMTP_PASSWORD=
+      - SMTP_ENCRYPTION=tls
+      
+      # Feature flags
+      - ENABLE_EMAIL_NOTIFICATIONS=true
+      - ENABLE_FILE_SHARING=true
+      - ENABLE_GRADING_SYSTEM=true
+      
+    volumes:
+      # Application code (uncomment for development)
+      # - ./:/var/www/html
+      
+      # Persistent storage
+      - app_uploads:/var/www/html/uploads
+      - app_logs:/var/www/html/logs
+      - app_cache:/var/www/html/cache
+      - app_sessions:/var/www/html/sessions
+      
+      # Environment file
+      - ./.env:/var/www/html/.env:ro
+      
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    
+    networks:
+      - classroom-network
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # MySQL database
+  mysql:
+    image: mysql:8.0
+    container_name: classroom-clone-mysql
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpassword
+      - MYSQL_DATABASE=classroom_clone
+      - MYSQL_USER=classroom_user
+      - MYSQL_PASSWORD=classroom_password
+      - MYSQL_CHARACTER_SET_SERVER=utf8mb4
+      - MYSQL_COLLATION_SERVER=utf8mb4_unicode_ci
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database/classroom_schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./database/sample_data.sql:/docker-entrypoint-initdb.d/02-data.sql:ro
+    command: >
+      --default-authentication-plugin=mysql_native_password
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --max-connections=200
+      --innodb-buffer-pool-size=256M
+      --innodb-log-file-size=64M
+      --innodb-flush-log-at-trx-commit=2
+      --innodb-file-per-table=1
+    networks:
+      - classroom-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Redis for caching and sessions
+  redis:
+    image: redis:7-alpine
+    container_name: classroom-clone-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: >
+      redis-server
+      --appendonly yes
+      --appendfsync everysec
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - classroom-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # phpMyAdmin for database management
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: classroom-clone-phpmyadmin
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    environment:
+      - PMA_HOST=mysql
+      - PMA_PORT=3306
+      - PMA_USER=classroom_user
+      - PMA_PASSWORD=classroom_password
+      - UPLOAD_LIMIT=50M
+      - MYSQL_ROOT_PASSWORD=rootpassword
+    depends_on:
+      - mysql
+    networks:
+      - classroom-network
+
+  # MailHog for email testing
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: classroom-clone-mailhog
+    restart: unless-stopped
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    networks:
+      - classroom-network
+
+  # Nginx reverse proxy (optional, for production)
+  nginx:
+    image: nginx:alpine
+    container_name: classroom-clone-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/ssl:/etc/nginx/ssl:ro
+      - app_uploads:/var/www/html/uploads:ro
+      - app_logs:/var/www/html/logs:ro
+    depends_on:
+      - app
+    networks:
+      - classroom-network
+    profiles:
+      - production
+
+  # Backup service
+  backup:
+    image: alpine:latest
+    container_name: classroom-clone-backup
+    restart: "no"
+    environment:
+      - MYSQL_PWD=classroom_password
+    volumes:
+      - ./backups:/backups
+      - mysql_data:/var/lib/mysql:ro
+      - app_uploads:/data/uploads:ro
+    command: >
+      sh -c "
+        apk add --no-cache mysql-client &&
+        mkdir -p /backups &&
+        DATE=$$(date +%Y%m%d_%H%M%S) &&
+        mysqldump -h mysql -u classroom_user classroom_clone > /backups/database_$$DATE.sql &&
+        tar -czf /backups/uploads_$$DATE.tar.gz -C /data uploads &&
+        echo 'Backup completed: $$DATE' &&
+        find /backups -name '*.sql' -mtime +7 -delete &&
+        find /backups -name '*.tar.gz' -mtime +7 -delete
+      "
+    depends_on:
+      - mysql
+    networks:
+      - classroom-network
+    profiles:
+      - backup
+
+  # Monitoring with Prometheus (optional)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: classroom-clone-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docker/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - classroom-network
+    profiles:
+      - monitoring
+
+  # Grafana for visualization (optional)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: classroom-clone-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./docker/grafana:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
+    networks:
+      - classroom-network
+    profiles:
+      - monitoring
+
+# Network configuration
+networks:
+  classroom-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+# Volume configuration
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+  app_uploads:
+    driver: local
+  app_logs:
+    driver: local
+  app_cache:
+    driver: local
+  app_sessions:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+# Extension configuration
+x-common-variables: &common-variables
+  APP_ENV: ${APP_ENV:-development}
+  DEBUG_MODE: ${DEBUG_MODE:-true}
+  DB_HOST: mysql
+  DB_NAME: classroom_clone
+  DB_USER: classroom_user
+  DB_PASS: classroom_password
+
+# Named networks for different environments
+networks:
+  default:
+    name: classroom-clone-dev
+  production:
+    name: classroom-clone-prod
+    driver: bridge
